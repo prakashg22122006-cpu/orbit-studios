@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -5,6 +6,36 @@ import { TrendingUp, Target, Award, Clock, CheckCircle2, BarChart3 } from "lucid
 import { Link } from "react-router-dom";
 
 const Analytics = () => {
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [habits, setHabits] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const savedTasks = localStorage.getItem('tasks');
+    const savedHabits = localStorage.getItem('habits');
+    const savedSessions = localStorage.getItem('studySessions');
+    
+    if (savedTasks) setTasks(JSON.parse(savedTasks));
+    if (savedHabits) setHabits(JSON.parse(savedHabits));
+    if (savedSessions) setSessions(JSON.parse(savedSessions));
+  }, []);
+
+  const taskCompletion = tasks.length > 0 
+    ? Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100) 
+    : 0;
+  
+  const habitSuccess = habits.length > 0 
+    ? Math.round((habits.filter(h => h.completedToday).length / habits.length) * 100) 
+    : 0;
+  
+  const totalStudyHours = sessions.reduce((sum, s) => sum + s.duration, 0) / 60;
+  
+  const studyByCategory = tasks.reduce((acc: any, task) => {
+    acc[task.category] = (acc[task.category] || 0) + 1;
+    return acc;
+  }, {});
+
+  const hasData = tasks.length > 0 || habits.length > 0 || sessions.length > 0;
   return (
     <div className="min-h-screen bg-secondary/30">
       <div className="container mx-auto px-4 py-8">
@@ -23,165 +54,157 @@ const Analytics = () => {
           </div>
         </div>
 
-        {/* Overview Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card className="gradient-card border-0 shadow-md">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <Target className="w-8 h-8 text-primary" />
-                <span className="text-3xl font-bold">87%</span>
+        {!hasData ? (
+          <Card className="shadow-lg mb-8">
+            <CardContent className="py-12 text-center">
+              <BarChart3 className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-2xl font-bold mb-2">No Data Yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Start adding tasks, habits, and study sessions to see your analytics
+              </p>
+              <div className="flex gap-4 justify-center">
+                <Button asChild>
+                  <Link to="/tasks">Add Tasks</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to="/habits">Add Habits</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to="/study">Start Studying</Link>
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground">Task Completion</p>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <Card className="gradient-card border-0 shadow-md">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Target className="w-8 h-8 text-primary" />
+                    <span className="text-3xl font-bold">{taskCompletion}%</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Task Completion</p>
+                </CardContent>
+              </Card>
 
-          <Card className="gradient-card border-0 shadow-md">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <Award className="w-8 h-8 text-accent" />
-                <span className="text-3xl font-bold">92%</span>
-              </div>
-              <p className="text-sm text-muted-foreground">Habit Success</p>
-            </CardContent>
-          </Card>
+              <Card className="gradient-card border-0 shadow-md">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Award className="w-8 h-8 text-accent" />
+                    <span className="text-3xl font-bold">{habitSuccess}%</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Habit Success</p>
+                </CardContent>
+              </Card>
 
-          <Card className="gradient-card border-0 shadow-md">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <Clock className="w-8 h-8 text-success" />
-                <span className="text-3xl font-bold">24.5h</span>
-              </div>
-              <p className="text-sm text-muted-foreground">Study Hours</p>
-            </CardContent>
-          </Card>
+              <Card className="gradient-card border-0 shadow-md">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Clock className="w-8 h-8 text-success" />
+                    <span className="text-3xl font-bold">{totalStudyHours.toFixed(1)}h</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Study Hours</p>
+                </CardContent>
+              </Card>
 
-          <Card className="gradient-card border-0 shadow-md">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="w-8 h-8 text-primary" />
-                <span className="text-3xl font-bold">+12%</span>
-              </div>
-              <p className="text-sm text-muted-foreground">This Week</p>
-            </CardContent>
-          </Card>
-        </div>
+              <Card className="gradient-card border-0 shadow-md">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <TrendingUp className="w-8 h-8 text-primary" />
+                    <span className="text-3xl font-bold">{sessions.length}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Sessions</p>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Weekly Progress */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl">Weekly Progress</CardTitle>
-              <CardDescription>Your productivity breakdown for this week</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Tasks Completed</span>
-                  <span className="text-sm text-muted-foreground">42/48</span>
+        {hasData && (
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl">Progress Overview</CardTitle>
+                <CardDescription>Your productivity metrics</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium">Tasks Completed</span>
+                    <span className="text-sm text-muted-foreground">
+                      {tasks.filter(t => t.completed).length}/{tasks.length}
+                    </span>
+                  </div>
+                  <Progress value={taskCompletion} className="h-2" />
                 </div>
-                <Progress value={87.5} className="h-2" />
-              </div>
-              
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Habits Maintained</span>
-                  <span className="text-sm text-muted-foreground">32/35</span>
+                
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium">Habits Completed Today</span>
+                    <span className="text-sm text-muted-foreground">
+                      {habits.filter(h => h.completedToday).length}/{habits.length}
+                    </span>
+                  </div>
+                  <Progress value={habitSuccess} className="h-2" />
                 </div>
-                <Progress value={91.4} className="h-2" />
-              </div>
-              
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Study Hours Goal</span>
-                  <span className="text-sm text-muted-foreground">24.5/28h</span>
+                
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium">Study Sessions</span>
+                    <span className="text-sm text-muted-foreground">{sessions.length} total</span>
+                  </div>
+                  <Progress value={Math.min((sessions.length / 20) * 100, 100)} className="h-2" />
                 </div>
-                <Progress value={87.5} className="h-2" />
-              </div>
-              
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Focus Sessions</span>
-                  <span className="text-sm text-muted-foreground">18/20</span>
-                </div>
-                <Progress value={90} className="h-2" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Category Breakdown */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl">Task Categories</CardTitle>
-              <CardDescription>Time spent by category this week</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <CategoryBar label="Study" hours={12} color="bg-primary" />
-              <CategoryBar label="Projects" hours={6} color="bg-accent" />
-              <CategoryBar label="Personal" hours={4} color="bg-success" />
-              <CategoryBar label="Health" hours={2.5} color="bg-destructive" />
-            </CardContent>
-          </Card>
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl">Task Categories</CardTitle>
+                <CardDescription>Distribution of your tasks</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Object.keys(studyByCategory).length > 0 ? (
+                  Object.entries(studyByCategory).map(([category, count]: [string, any]) => (
+                    <CategoryBar 
+                      key={category}
+                      label={category} 
+                      hours={count} 
+                      color="bg-primary" 
+                    />
+                  ))
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No category data yet</p>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Top Achievements */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl">Recent Achievements</CardTitle>
-              <CardDescription>Your latest milestones and badges</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <AchievementItem 
-                icon={<Award className="w-6 h-6 text-accent" />}
-                title="7 Day Streak"
-                description="Maintained habits for a full week"
-              />
-              <AchievementItem 
-                icon={<CheckCircle2 className="w-6 h-6 text-success" />}
-                title="100 Tasks Completed"
-                description="Reached task completion milestone"
-              />
-              <AchievementItem 
-                icon={<Clock className="w-6 h-6 text-primary" />}
-                title="50 Hours Studied"
-                description="Total focus time achievement"
-              />
-              <AchievementItem 
-                icon={<TrendingUp className="w-6 h-6 text-accent" />}
-                title="Productivity Master"
-                description="90%+ completion rate this month"
-              />
-            </CardContent>
-          </Card>
-
-          {/* Performance Insights */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl">Performance Insights</CardTitle>
-              <CardDescription>AI-powered productivity analysis</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <InsightCard 
-                icon={<TrendingUp className="w-5 h-5 text-success" />}
-                title="Peak Productivity"
-                description="You're most productive between 8-10 PM"
-              />
-              <InsightCard 
-                icon={<BarChart3 className="w-5 h-5 text-primary" />}
-                title="Study Pattern"
-                description="Best focus during 90-minute deep sessions"
-              />
-              <InsightCard 
-                icon={<Award className="w-5 h-5 text-accent" />}
-                title="Habit Consistency"
-                description="Morning habits have the highest success rate"
-              />
-              <InsightCard 
-                icon={<Target className="w-5 h-5 text-success" />}
-                title="Goal Progress"
-                description="On track to exceed this month's targets by 15%"
-              />
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl">Summary</CardTitle>
+                <CardDescription>Your productivity at a glance</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <InsightCard 
+                  icon={<Target className="w-5 h-5 text-primary" />}
+                  title="Total Tasks"
+                  description={`${tasks.length} tasks created, ${tasks.filter(t => t.completed).length} completed`}
+                />
+                <InsightCard 
+                  icon={<Award className="w-5 h-5 text-accent" />}
+                  title="Total Habits"
+                  description={`${habits.length} habits tracked with ${habits.reduce((sum, h) => sum + h.xp, 0)} XP earned`}
+                />
+                <InsightCard 
+                  icon={<Clock className="w-5 h-5 text-success" />}
+                  title="Study Time"
+                  description={`${sessions.length} sessions completed for ${totalStudyHours.toFixed(1)} hours total`}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

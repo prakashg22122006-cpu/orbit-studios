@@ -1,17 +1,45 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Play, Pause, RotateCcw, BarChart3 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Clock, Play, Pause, RotateCcw, BarChart3, Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+
+interface StudySession {
+  id: number;
+  subject: string;
+  duration: number;
+  date: string;
+  completed: boolean;
+}
 
 const Study = () => {
   const [isActive, setIsActive] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [sessionType, setSessionType] = useState<"pomodoro" | "deep">("pomodoro");
-  const pomodoroTime = 25 * 60; // 25 minutes
-  const deepFocusTime = 90 * 60; // 90 minutes
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [currentSubject, setCurrentSubject] = useState("");
+  const [isSubjectDialogOpen, setIsSubjectDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const pomodoroTime = 25 * 60;
+  const deepFocusTime = 90 * 60;
   const targetTime = sessionType === "pomodoro" ? pomodoroTime : deepFocusTime;
+
+  useEffect(() => {
+    const savedSessions = localStorage.getItem('studySessions');
+    if (savedSessions) {
+      setSessions(JSON.parse(savedSessions));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('studySessions', JSON.stringify(sessions));
+  }, [sessions]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -22,6 +50,7 @@ const Study = () => {
       }, 1000);
     } else if (seconds >= targetTime) {
       setIsActive(false);
+      completeSession();
     }
 
     return () => {
@@ -37,26 +66,62 @@ const Study = () => {
 
   const progress = (seconds / targetTime) * 100;
 
-  const toggleTimer = () => setIsActive(!isActive);
+  const toggleTimer = () => {
+    if (!isActive && seconds === 0 && !currentSubject) {
+      setIsSubjectDialogOpen(true);
+    } else {
+      setIsActive(!isActive);
+    }
+  };
+
   const resetTimer = () => {
     setIsActive(false);
     setSeconds(0);
   };
 
-  const recentSessions = [
-    { subject: "Mathematics", duration: 90, date: "Today", completed: true },
-    { subject: "Chemistry", duration: 60, date: "Today", completed: true },
-    { subject: "History", duration: 45, date: "Yesterday", completed: true },
-    { subject: "Physics", duration: 75, date: "Yesterday", completed: true },
-  ];
+  const startWithSubject = () => {
+    if (currentSubject.trim()) {
+      setIsSubjectDialogOpen(false);
+      setIsActive(true);
+      toast({
+        title: "Study session started",
+        description: `Focus on ${currentSubject}`,
+      });
+    }
+  };
 
-  const totalStudyTime = recentSessions.reduce((sum, s) => sum + s.duration, 0);
-  const avgSessionTime = Math.round(totalStudyTime / recentSessions.length);
+  const completeSession = () => {
+    if (currentSubject) {
+      const newSession: StudySession = {
+        id: Date.now(),
+        subject: currentSubject,
+        duration: Math.floor(targetTime / 60),
+        date: new Date().toLocaleDateString(),
+        completed: true
+      };
+      setSessions([newSession, ...sessions]);
+      setCurrentSubject("");
+      toast({
+        title: "Session completed! 🎉",
+        description: `Great work on ${currentSubject}`,
+      });
+    }
+  };
+
+  const deleteSession = (id: number) => {
+    setSessions(sessions.filter(s => s.id !== id));
+    toast({
+      title: "Session deleted",
+      description: "Study session has been removed",
+    });
+  };
+
+  const totalStudyTime = sessions.reduce((sum, s) => sum + s.duration, 0);
+  const avgSessionTime = sessions.length > 0 ? Math.round(totalStudyTime / sessions.length) : 0;
 
   return (
     <div className="min-h-screen bg-secondary/30">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -72,16 +137,14 @@ const Study = () => {
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {/* Timer Card */}
           <Card className="md:col-span-2 shadow-lg">
             <CardHeader>
               <CardTitle className="text-2xl">Focus Timer</CardTitle>
               <CardDescription>
-                Choose your study mode and start focusing
+                {currentSubject ? `Studying: ${currentSubject}` : "Choose your study mode and start focusing"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Mode Selection */}
               <div className="flex gap-4">
                 <Button
                   variant={sessionType === "pomodoro" ? "default" : "outline"}
@@ -90,6 +153,7 @@ const Study = () => {
                     resetTimer();
                   }}
                   className="flex-1"
+                  disabled={isActive}
                 >
                   Pomodoro (25 min)
                 </Button>
@@ -100,12 +164,12 @@ const Study = () => {
                     resetTimer();
                   }}
                   className="flex-1"
+                  disabled={isActive}
                 >
                   Deep Focus (90 min)
                 </Button>
               </div>
 
-              {/* Timer Display */}
               <div className="text-center py-8">
                 <div className="text-7xl md:text-8xl font-bold mb-4 gradient-hero bg-clip-text text-transparent">
                   {formatTime(seconds)}
@@ -116,7 +180,6 @@ const Study = () => {
                 </p>
               </div>
 
-              {/* Timer Controls */}
               <div className="flex gap-4 justify-center">
                 <Button
                   size="lg"
@@ -139,6 +202,7 @@ const Study = () => {
                   size="lg"
                   variant="outline"
                   onClick={resetTimer}
+                  disabled={isActive}
                 >
                   <RotateCcw className="mr-2 h-5 w-5" />
                   Reset
@@ -147,7 +211,6 @@ const Study = () => {
             </CardContent>
           </Card>
 
-          {/* Stats Card */}
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="text-2xl">Session Stats</CardTitle>
@@ -164,7 +227,7 @@ const Study = () => {
               <div className="p-4 rounded-lg bg-gradient-to-br from-success/10 to-success/5">
                 <div className="flex items-center justify-between mb-2">
                   <BarChart3 className="w-6 h-6 text-success" />
-                  <span className="text-3xl font-bold">{recentSessions.length}</span>
+                  <span className="text-3xl font-bold">{sessions.length}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Sessions Completed</p>
               </div>
@@ -179,35 +242,72 @@ const Study = () => {
             </CardContent>
           </Card>
 
-          {/* Recent Sessions */}
           <Card className="md:col-span-3 shadow-lg">
             <CardHeader>
               <CardTitle className="text-2xl">Recent Study Sessions</CardTitle>
               <CardDescription>Your focus history and productivity breakdown</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentSessions.map((session, index) => (
-                  <div 
-                    key={index}
-                    className="flex items-center gap-4 p-4 rounded-lg bg-secondary/50"
-                  >
-                    <Clock className="w-5 h-5 text-success flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium">{session.subject}</p>
-                      <p className="text-sm text-muted-foreground">{session.date}</p>
+              {sessions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Clock className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg mb-2">No study sessions yet</p>
+                  <p className="text-sm">Start your first focus session above!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sessions.map((session) => (
+                    <div 
+                      key={session.id}
+                      className="flex items-center gap-4 p-4 rounded-lg bg-secondary/50 group hover:bg-secondary transition-smooth"
+                    >
+                      <Clock className="w-5 h-5 text-success flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium">{session.subject}</p>
+                        <p className="text-sm text-muted-foreground">{session.date}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">{session.duration} min</p>
+                        <p className="text-xs text-success">Completed</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => deleteSession(session.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-smooth"
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold">{session.duration} min</p>
-                      <p className="text-xs text-success">Completed</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <Dialog open={isSubjectDialogOpen} onOpenChange={setIsSubjectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>What are you studying?</DialogTitle>
+            <DialogDescription>Enter the subject or topic for this focus session</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Subject/Topic</Label>
+            <Input 
+              placeholder="e.g., Mathematics, Chemistry, History..."
+              value={currentSubject}
+              onChange={(e) => setCurrentSubject(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && startWithSubject()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSubjectDialogOpen(false)}>Cancel</Button>
+            <Button onClick={startWithSubject}>Start Session</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

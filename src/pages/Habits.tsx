@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Award, Trophy, Star } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckCircle2, Award, Trophy, Star, Plus, Edit, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface Habit {
   id: number;
@@ -15,17 +20,28 @@ interface Habit {
 }
 
 const Habits = () => {
-  const [habits, setHabits] = useState<Habit[]>([
-    { id: 1, title: "Morning Exercise", streak: 12, completedToday: false, category: "Health", xp: 120 },
-    { id: 2, title: "Read for 30 min", streak: 8, completedToday: false, category: "Learning", xp: 80 },
-    { id: 3, title: "Practice Meditation", streak: 5, completedToday: false, category: "Wellness", xp: 50 },
-    { id: 4, title: "Journal Entry", streak: 15, completedToday: false, category: "Personal", xp: 150 },
-    { id: 5, title: "Study Session", streak: 20, completedToday: false, category: "Study", xp: 200 },
-  ]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [newHabitTitle, setNewHabitTitle] = useState("");
+  const [newHabitCategory, setNewHabitCategory] = useState("Health");
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const savedHabits = localStorage.getItem('habits');
+    if (savedHabits) {
+      setHabits(JSON.parse(savedHabits));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('habits', JSON.stringify(habits));
+  }, [habits]);
 
   const totalXP = habits.reduce((sum, habit) => sum + habit.xp, 0);
   const completedToday = habits.filter(h => h.completedToday).length;
-  const longestStreak = Math.max(...habits.map(h => h.streak));
+  const longestStreak = habits.length > 0 ? Math.max(...habits.map(h => h.streak)) : 0;
 
   const toggleHabit = (id: number) => {
     setHabits(habits.map(habit => {
@@ -34,18 +50,69 @@ const Habits = () => {
         return {
           ...habit,
           completedToday: newCompleted,
-          streak: newCompleted ? habit.streak + 1 : habit.streak,
-          xp: newCompleted ? habit.xp + 10 : habit.xp
+          streak: newCompleted ? habit.streak + 1 : Math.max(0, habit.streak - 1),
+          xp: newCompleted ? habit.xp + 10 : Math.max(0, habit.xp - 10)
         };
       }
       return habit;
     }));
+    toast({
+      title: "Habit updated",
+      description: "Keep up the great work!",
+    });
+  };
+
+  const addHabit = () => {
+    if (newHabitTitle.trim()) {
+      const newHabit: Habit = {
+        id: Date.now(),
+        title: newHabitTitle,
+        streak: 0,
+        completedToday: false,
+        category: newHabitCategory,
+        xp: 0
+      };
+      setHabits([...habits, newHabit]);
+      setNewHabitTitle("");
+      setNewHabitCategory("Health");
+      setIsAddDialogOpen(false);
+      toast({
+        title: "Habit created",
+        description: "Start building your new habit today!",
+      });
+    }
+  };
+
+  const deleteHabit = (id: number) => {
+    setHabits(habits.filter(habit => habit.id !== id));
+    toast({
+      title: "Habit deleted",
+      description: "Habit has been removed",
+    });
+  };
+
+  const openEditDialog = (habit: Habit) => {
+    setEditingHabit(habit);
+    setIsEditDialogOpen(true);
+  };
+
+  const saveEdit = () => {
+    if (editingHabit) {
+      setHabits(habits.map(habit => 
+        habit.id === editingHabit.id ? editingHabit : habit
+      ));
+      setIsEditDialogOpen(false);
+      setEditingHabit(null);
+      toast({
+        title: "Habit updated",
+        description: "Changes saved successfully",
+      });
+    }
   };
 
   return (
     <div className="min-h-screen bg-secondary/30">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -54,13 +121,18 @@ const Habits = () => {
                 Build consistency, earn rewards, and track your progress
               </p>
             </div>
-            <Button asChild variant="outline">
-              <Link to="/dashboard">Back to Dashboard</Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Habit
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/dashboard">Back</Link>
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="gradient-card border-0 shadow-lg">
             <CardContent className="pt-6">
@@ -93,24 +165,36 @@ const Habits = () => {
           </Card>
         </div>
 
-        {/* Habits List */}
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-2xl">Your Daily Habits</CardTitle>
             <CardDescription>Check off each habit as you complete them today</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {habits.map(habit => (
-              <HabitCard 
-                key={habit.id}
-                habit={habit}
-                onToggle={() => toggleHabit(habit.id)}
-              />
-            ))}
+            {habits.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Award className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg mb-2">No habits yet</p>
+                <p className="text-sm mb-4">Start building positive habits today!</p>
+                <Button onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Your First Habit
+                </Button>
+              </div>
+            ) : (
+              habits.map(habit => (
+                <HabitCard 
+                  key={habit.id}
+                  habit={habit}
+                  onToggle={() => toggleHabit(habit.id)}
+                  onEdit={() => openEditDialog(habit)}
+                  onDelete={() => deleteHabit(habit.id)}
+                />
+              ))
+            )}
           </CardContent>
         </Card>
 
-        {/* Achievements */}
         <Card className="mt-8 shadow-lg">
           <CardHeader>
             <CardTitle className="text-2xl">Achievements</CardTitle>
@@ -142,13 +226,105 @@ const Habits = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Habit Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Habit</DialogTitle>
+            <DialogDescription>Create a new habit to track daily</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Habit Title</Label>
+              <Input 
+                placeholder="e.g., Morning Exercise"
+                value={newHabitTitle}
+                onChange={(e) => setNewHabitTitle(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select value={newHabitCategory} onValueChange={setNewHabitCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Health">Health</SelectItem>
+                  <SelectItem value="Learning">Learning</SelectItem>
+                  <SelectItem value="Wellness">Wellness</SelectItem>
+                  <SelectItem value="Personal">Personal</SelectItem>
+                  <SelectItem value="Study">Study</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={addHabit}>Add Habit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Habit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Habit</DialogTitle>
+            <DialogDescription>Update your habit details</DialogDescription>
+          </DialogHeader>
+          {editingHabit && (
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Habit Title</Label>
+                <Input 
+                  value={editingHabit.title}
+                  onChange={(e) => setEditingHabit({...editingHabit, title: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select 
+                  value={editingHabit.category} 
+                  onValueChange={(value) => setEditingHabit({...editingHabit, category: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Health">Health</SelectItem>
+                    <SelectItem value="Learning">Learning</SelectItem>
+                    <SelectItem value="Wellness">Wellness</SelectItem>
+                    <SelectItem value="Personal">Personal</SelectItem>
+                    <SelectItem value="Study">Study</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-const HabitCard = ({ habit, onToggle }: { habit: Habit; onToggle: () => void }) => {
+const HabitCard = ({ 
+  habit, 
+  onToggle, 
+  onEdit, 
+  onDelete 
+}: { 
+  habit: Habit; 
+  onToggle: () => void; 
+  onEdit: () => void;
+  onDelete: () => void;
+}) => {
   return (
-    <div className="flex items-center gap-4 p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-smooth">
+    <div className="flex items-center gap-4 p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-smooth group">
       <button 
         onClick={onToggle}
         className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
@@ -182,6 +358,23 @@ const HabitCard = ({ habit, onToggle }: { habit: Habit; onToggle: () => void }) 
             <span className="text-xl font-bold">{habit.xp}</span>
           </div>
           <p className="text-xs text-muted-foreground">XP</p>
+        </div>
+
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-smooth">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onEdit}
+          >
+            <Edit className="w-4 h-4 text-primary" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onDelete}
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
         </div>
       </div>
     </div>

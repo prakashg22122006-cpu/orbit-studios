@@ -1,13 +1,49 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Award, Clock, TrendingUp, Target, Calendar } from "lucide-react";
+import { CheckCircle2, Award, Clock, TrendingUp, Target } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+interface Task {
+  id: number;
+  title: string;
+  priority: string;
+  completed: boolean;
+}
+
+interface Habit {
+  id: number;
+  title: string;
+  completedToday: boolean;
+  streak: number;
+}
+
+interface StudySession {
+  id: number;
+  subject: string;
+  duration: number;
+  completed: boolean;
+}
 
 const Dashboard = () => {
-  const todayTasks = 8;
-  const completedTasks = 5;
-  const currentStreak = 12;
-  const studyHoursToday = 3.5;
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+
+  useEffect(() => {
+    const savedTasks = localStorage.getItem('tasks');
+    const savedHabits = localStorage.getItem('habits');
+    const savedSessions = localStorage.getItem('studySessions');
+    
+    if (savedTasks) setTasks(JSON.parse(savedTasks));
+    if (savedHabits) setHabits(JSON.parse(savedHabits));
+    if (savedSessions) setSessions(JSON.parse(savedSessions));
+  }, []);
+
+  const todayTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const currentStreak = habits.length > 0 ? Math.max(...habits.map(h => h.streak)) : 0;
+  const studyHoursToday = sessions.reduce((sum, s) => sum + (s.completed ? s.duration : 0), 0) / 60;
 
   return (
     <div className="min-h-screen bg-secondary/30">
@@ -79,11 +115,24 @@ const Dashboard = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <TaskItem title="Complete Math Assignment" priority="high" completed={true} />
-              <TaskItem title="Study for Chemistry Exam" priority="high" completed={true} />
-              <TaskItem title="Read Chapter 5 - History" priority="medium" completed={true} />
-              <TaskItem title="Practice Python Coding" priority="medium" completed={false} />
-              <TaskItem title="Group Project Meeting" priority="low" completed={false} />
+              {tasks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No tasks yet. Start by adding your first task!</p>
+                  <Button asChild className="mt-4" size="sm">
+                    <Link to="/tasks">Add Task</Link>
+                  </Button>
+                </div>
+              ) : (
+                tasks.slice(0, 5).map(task => (
+                  <TaskItem 
+                    key={task.id}
+                    title={task.title} 
+                    priority={task.priority} 
+                    completed={task.completed} 
+                  />
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -134,10 +183,24 @@ const Dashboard = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <HabitItem title="Morning Exercise" completed={true} streak={12} />
-              <HabitItem title="Read for 30 min" completed={true} streak={8} />
-              <HabitItem title="Practice Meditation" completed={false} streak={5} />
-              <HabitItem title="Journal Entry" completed={false} streak={15} />
+              {habits.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No habits tracked yet. Build your first habit!</p>
+                  <Button asChild className="mt-4" size="sm">
+                    <Link to="/habits">Add Habit</Link>
+                  </Button>
+                </div>
+              ) : (
+                habits.slice(0, 4).map(habit => (
+                  <HabitItem 
+                    key={habit.id}
+                    title={habit.title} 
+                    completed={habit.completedToday} 
+                    streak={habit.streak} 
+                  />
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -155,9 +218,24 @@ const Dashboard = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <SessionItem subject="Mathematics" duration={90} completed={true} />
-              <SessionItem subject="Chemistry" duration={60} completed={true} />
-              <SessionItem subject="History" duration={45} completed={true} />
+              {sessions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No study sessions yet. Start your first session!</p>
+                  <Button asChild className="mt-4" size="sm">
+                    <Link to="/study">Start Session</Link>
+                  </Button>
+                </div>
+              ) : (
+                sessions.slice(0, 3).map(session => (
+                  <SessionItem 
+                    key={session.id}
+                    subject={session.subject} 
+                    duration={session.duration} 
+                    completed={session.completed} 
+                  />
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

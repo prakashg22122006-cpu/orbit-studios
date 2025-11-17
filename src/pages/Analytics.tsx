@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { TrendingUp, Target, Award, Clock, CheckCircle2, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { storage, STORES } from "@/lib/storage";
+import NavBar from "@/components/NavBar";
 
 const Analytics = () => {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -11,13 +13,21 @@ const Analytics = () => {
   const [sessions, setSessions] = useState<any[]>([]);
 
   useEffect(() => {
-    const savedTasks = localStorage.getItem('tasks');
-    const savedHabits = localStorage.getItem('habits');
-    const savedSessions = localStorage.getItem('studySessions');
-    
-    if (savedTasks) setTasks(JSON.parse(savedTasks));
-    if (savedHabits) setHabits(JSON.parse(savedHabits));
-    if (savedSessions) setSessions(JSON.parse(savedSessions));
+    const loadData = async () => {
+      try {
+        const [tasksData, habitsData, sessionsData] = await Promise.all([
+          storage.getAll(STORES.tasks),
+          storage.getAll(STORES.habits),
+          storage.getAll(STORES.studySessions)
+        ]);
+        setTasks(tasksData);
+        setHabits(habitsData);
+        setSessions(sessionsData);
+      } catch (error) {
+        console.error('Failed to load analytics data:', error);
+      }
+    };
+    loadData();
   }, []);
 
   const taskCompletion = tasks.length > 0 
@@ -37,8 +47,10 @@ const Analytics = () => {
 
   const hasData = tasks.length > 0 || habits.length > 0 || sessions.length > 0;
   return (
-    <div className="min-h-screen bg-secondary/30">
-      <div className="container mx-auto px-4 py-8">
+    <>
+      <NavBar />
+      <div className="min-h-screen bg-secondary/30">
+        <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">

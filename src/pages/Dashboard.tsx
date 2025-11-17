@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Award, Clock, TrendingUp, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { storage, STORES } from "@/lib/storage";
+import NavBar from "@/components/NavBar";
 
 interface Task {
   id: number;
@@ -31,13 +33,21 @@ const Dashboard = () => {
   const [sessions, setSessions] = useState<StudySession[]>([]);
 
   useEffect(() => {
-    const savedTasks = localStorage.getItem('tasks');
-    const savedHabits = localStorage.getItem('habits');
-    const savedSessions = localStorage.getItem('studySessions');
-    
-    if (savedTasks) setTasks(JSON.parse(savedTasks));
-    if (savedHabits) setHabits(JSON.parse(savedHabits));
-    if (savedSessions) setSessions(JSON.parse(savedSessions));
+    const loadData = async () => {
+      try {
+        const [tasksData, habitsData, sessionsData] = await Promise.all([
+          storage.getAll(STORES.tasks),
+          storage.getAll(STORES.habits),
+          storage.getAll(STORES.studySessions)
+        ]);
+        setTasks(tasksData);
+        setHabits(habitsData);
+        setSessions(sessionsData);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      }
+    };
+    loadData();
   }, []);
 
   const todayTasks = tasks.length;
@@ -46,8 +56,10 @@ const Dashboard = () => {
   const studyHoursToday = sessions.reduce((sum, s) => sum + (s.completed ? s.duration : 0), 0) / 60;
 
   return (
-    <div className="min-h-screen bg-secondary/30">
-      <div className="container mx-auto px-4 py-8">
+    <>
+      <NavBar />
+      <div className="min-h-screen bg-secondary/30">
+        <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl md:text-5xl mb-2">Welcome Back! 🚀</h1>

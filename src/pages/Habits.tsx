@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CheckCircle2, Award, Trophy, Star, Plus, Edit, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { storage, STORES } from "@/lib/storage";
+import NavBar from "@/components/NavBar";
 
 interface Habit {
   id: number;
@@ -29,14 +31,30 @@ const Habits = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const savedHabits = localStorage.getItem('habits');
-    if (savedHabits) {
-      setHabits(JSON.parse(savedHabits));
-    }
+    const loadHabits = async () => {
+      try {
+        const data = await storage.getAll(STORES.habits);
+        setHabits(data);
+      } catch (error) {
+        console.error('Failed to load habits:', error);
+      }
+    };
+    loadHabits();
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('habits', JSON.stringify(habits));
+    const saveHabits = async () => {
+      try {
+        for (const habit of habits) {
+          await storage.update(STORES.habits, habit);
+        }
+      } catch (error) {
+        console.error('Failed to save habits:', error);
+      }
+    };
+    if (habits.length > 0) {
+      saveHabits();
+    }
   }, [habits]);
 
   const totalXP = habits.reduce((sum, habit) => sum + habit.xp, 0);
@@ -62,7 +80,7 @@ const Habits = () => {
     });
   };
 
-  const addHabit = () => {
+  const addHabit = async () => {
     if (newHabitTitle.trim()) {
       const newHabit: Habit = {
         id: Date.now(),
@@ -72,23 +90,41 @@ const Habits = () => {
         category: newHabitCategory,
         xp: 0
       };
-      setHabits([...habits, newHabit]);
-      setNewHabitTitle("");
-      setNewHabitCategory("Health");
-      setIsAddDialogOpen(false);
-      toast({
-        title: "Habit created",
-        description: "Start building your new habit today!",
-      });
+      try {
+        await storage.add(STORES.habits, { ...newHabit, id: newHabit.id.toString() });
+        setHabits([...habits, newHabit]);
+        setNewHabitTitle("");
+        setNewHabitCategory("Health");
+        setIsAddDialogOpen(false);
+        toast({
+          title: "Habit created",
+          description: "Start building your new habit today!",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to create habit",
+          variant: "destructive",
+        });
+      }
     }
   };
 
-  const deleteHabit = (id: number) => {
-    setHabits(habits.filter(habit => habit.id !== id));
-    toast({
-      title: "Habit deleted",
-      description: "Habit has been removed",
-    });
+  const deleteHabit = async (id: number) => {
+    try {
+      await storage.delete(STORES.habits, id.toString());
+      setHabits(habits.filter(habit => habit.id !== id));
+      toast({
+        title: "Habit deleted",
+        description: "Habit has been removed",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete habit",
+        variant: "destructive",
+      });
+    }
   };
 
   const openEditDialog = (habit: Habit) => {
@@ -111,8 +147,10 @@ const Habits = () => {
   };
 
   return (
-    <div className="min-h-screen bg-secondary/30">
-      <div className="container mx-auto px-4 py-8">
+    <>
+      <NavBar />
+      <div className="min-h-screen bg-secondary/30">
+        <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -378,27 +416,83 @@ const HabitCard = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
-const AchievementBadge = ({ 
-  icon, 
-  title, 
-  unlocked 
+const HabitCard = ({ 
+  habit, 
+  onToggle, 
+  onEdit, 
+  onDelete 
 }: { 
-  icon: React.ReactNode; 
-  title: string; 
-  unlocked: boolean;
+  habit: Habit; 
+  onToggle: () => void; 
+  onEdit: () => void;
+  onDelete: () => void;
 }) => {
   return (
-    <div 
-      className={`p-6 rounded-xl text-center transition-smooth ${
-        unlocked 
-          ? 'bg-gradient-to-br from-accent/20 to-primary/20 border-2 border-accent' 
-          : 'bg-muted/50 opacity-50'
-      }`}
-    >
-      <div className={`mb-2 inline-flex ${unlocked ? 'text-accent' : 'text-muted-foreground'}`}>
+    <div className="flex items-center gap-4 p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-smooth group">
+      <button 
+        onClick={onToggle}
+        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+          habit.completedToday 
+            ? 'bg-success border-success' 
+            : 'border-muted-foreground hover:border-success'
+        }`}
+      >
+        {habit.completedToday && <CheckCircle2 className="w-6 h-6 text-white" />}
+      </button>
+
+      <div className="flex-1">
+        <p className={`font-medium text-lg ${habit.completedToday ? 'line-through text-muted-foreground' : ''}`}>
+          {habit.title}
+        </p>
+        <Badge variant="outline" className="mt-1">{habit.category}</Badge>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="text-right">
+          <div className="flex items-center gap-1 text-accent">
+            <Award className="w-5 h-5" />
+            <span className="text-xl font-bold">{habit.streak}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">day streak</p>
+        </div>
+
+        <div className="text-right">
+          <div className="flex items-center gap-1 text-primary">
+            <Star className="w-5 h-5" />
+            <span className="text-xl font-bold">{habit.xp}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">XP</p>
+        </div>
+
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-smooth">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onEdit}
+          >
+            <Edit className="w-4 h-4 text-primary" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onDelete}
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AchievementBadge = ({ icon, title }: { icon: React.ReactNode; title: string }) => {
+  return (
+    <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gradient-to-br from-primary/5 to-accent/5">
+      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-glow">
         {icon}
       </div>
       <p className="text-sm font-medium">{title}</p>
